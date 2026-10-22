@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RGB Recolor</title>
+<style>
+:root{--bg:#f3f1f8;--sf:#fff;--tx:#1b1630;--mu:#6b6585;--ln:#d9d4ea;--ac:#6a3df0;--act:#fff;--ck1:#e6e2f2;--ck2:#fafaff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#14101f;--sf:#1f1930;--tx:#f0ecfb;--mu:#a69fc0;--ln:#352c52;--ac:#9a7bff;--act:#14101f;--ck1:#2a2340;--ck2:#1f1930;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 "Trebuchet MS",system-ui,sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:0 0 4px}
+p.s{margin:0 0 16px;color:var(--mu);font-size:.9rem}
+section{background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:14px;margin-bottom:14px}
+h2{font-size:1rem;margin:0 0 10px}
+button,.btn{font:inherit;border:1px solid var(--ln);background:var(--sf);color:var(--tx);border-radius:10px;padding:10px 14px;min-height:44px}
+button.p,.btn.p{background:var(--ac);color:var(--act);border-color:var(--ac);font-weight:700}
+input[type=text]{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:8px 10px;min-height:44px;width:100%}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.row input[type=color]{width:52px;height:44px;border:1px solid var(--ln);border-radius:10px;padding:2px;background:var(--bg)}
+.row .hx{flex:1;min-width:110px;font-family:ui-monospace,monospace}
+.tag{width:96px;font-weight:700}
+.view{overflow:auto;border-radius:10px;border:1px solid var(--ln);background-color:var(--ck2);background-image:conic-gradient(var(--ck1) 25%,transparent 0 50%,var(--ck1) 0 75%,transparent 0);background-size:20px 20px}
+canvas{display:block;max-width:none}
+.pl{display:flex;flex-direction:column;gap:8px}
+.pi{display:flex;gap:8px;align-items:center}
+.pi .sw{display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--ln);flex:none}
+.pi .sw i{width:20px;height:28px;display:block}
+.pi .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hint{color:var(--mu);font-size:.85rem;margin:8px 0 0}
+#zoomrow label{color:var(--mu);font-size:.85rem}
+input[type=range]{flex:1;min-width:120px}
+#bp{font-family:ui-monospace,monospace;font-size:.85rem;word-break:break-all;margin-bottom:8px}
+#bl{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto;margin-bottom:10px}
+#bl button{text-align:left}
+</style>
+</head>
+<body>
+<main>
+<h1>RGB перекраска нот</h1>
+<p class="s">Красный, зелёный и синий каналы текстуры заменяются твоими цветами, как в RGB-шейдере Psych Engine.</p>
+
+<section>
+<h2>Текстура</h2>
+<label class="btn p" style="display:inline-block">Выбрать PNG<input id="file" type="file" accept="image/*" hidden></label>
+<div class="hint" id="fi">Файл не выбран</div>
+</section>
+
+<section>
+<h2>Цвета каналов</h2>
+<div class="row"><span class="tag" style="color:#e0243a">Красный</span><input type="color" id="c0" value="#ff0000"><input type="text" class="hx" id="h0" value="#ff0000" maxlength="7" autocapitalize="off" spellcheck="false"></div>
+<div class="row"><span class="tag" style="color:#1c9c4a">Зелёный</span><input type="color" id="c1" value="#00ff00"><input type="text" class="hx" id="h1" value="#00ff00" maxlength="7" autocapitalize="off" spellcheck="false"></div>
+<div class="row"><span class="tag" style="color:#3a5bf0">Синий</span><input type="color" id="c2" value="#0000ff"><input type="text" class="hx" id="h2" value="#0000ff" maxlength="7" autocapitalize="off" spellcheck="false"></div>
+<button id="rs">Сбросить</button>
+</section>
+
+<section>
+<h2>Превью</h2>
+<div class="row" id="zoomrow"><label for="zm">Масштаб</label><input type="range" id="zm" min="25" max="200" value="50"><span id="zv">50%</span></div>
+<div class="view"><canvas id="cv" width="1" height="1"></canvas></div>
+<div class="hint" id="empty">Выбери текстуру, и превью появится здесь.</div>
+<div class="row" style="margin-top:10px"><button class="p" id="bg">В галерею</button><button class="p" id="bsa">Сохранить как…</button><button class="p" id="bs">Сохранить</button></div>
+<div class="hint" id="dn"></div>
+<div class="hint" id="dm"></div>
+</section>
+
+<section id="fb" style="display:none">
+<h2>Выбор папки</h2>
+<div id="bp"></div>
+<div id="bl"></div>
+<div class="row"><button id="bup">Назад</button><button id="bnew">Новая папка</button></div>
+<div class="row"><button class="p" id="bok">Выбрать эту папку</button><button id="bno">Отмена</button></div>
+</section>
+
+<section>
+<h2>Пресеты</h2>
+<div class="row"><input type="text" id="pn" placeholder="Название пресета" maxlength="30"><button class="p" id="ps">Сохранить цвета</button></div>
+<div class="pl" id="pl"></div>
+<div class="hint" id="pe">Пока нет сохранённых пресетов.</div>
+</section>
+</main>
+
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var cv=$('cv'),ctx=cv.getContext('2d',{willReadFrequently:true});
+var src=null,W=0,H=0,ready=false,fname='recolor';
+var DEF=['#ff0000','#00ff00','#0000ff'];
+var cs=[0,1,2].map(function(i){return $('c'+i)});
+var hs=[0,1,2].map(function(i){return $('h'+i)});
+
+function hexToRgb(h){var m=/^#?([0-9a-f]{6})$/i.exec(h);if(!m)return null;var n=parseInt(m[1],16);return[(n>>16)&255,(n>>8)&255,n&255]}
+function cols(){return cs.map(function(c){return hexToRgb(c.value)})}
+
+function render(){
+ if(!ready)return;
+ var c=cols(),up=true,kb=true;
+ var d=new ImageData(new Uint8ClampedArray(src.data),W,H),p=d.data;
+ for(var i=0;i<p.length;i+=4){
+  var a=p[i+3];
+  if(a===0){p[i]=0;p[i+1]=0;p[i+2]=0;continue}
+  var s=(up&&a<255)?255/a:1;
+  var r=Math.min(1,p[i]/255*s),g=Math.min(1,p[i+1]/255*s),b=Math.min(1,p[i+2]/255*s),dv=1;
+  if(kb){
+   var t=r+g+b;
+   if(t<0.004){p[i]=0;p[i+1]=0;p[i+2]=0;p[i+3]=0;continue}
+   if(t<1){dv=t;p[i+3]=a*t}
+  }
+  for(var k=0;k<3;k++){
+   var v=(r*c[0][k]+g*c[1][k]+b*c[2][k])/dv;
+   p[i+k]=v>255?255:v;
+  }
+ }
+ ctx.putImageData(d,0,0);
+}
+
+function zoom(){
+ var z=$('zm').value;
+ $('zv').textContent=z+'%';
+ cv.style.width=Math.round(W*z/100)+'px';
+ cv.style.height=Math.round(H*z/100)+'px';
+}
+
+$('file').addEventListener('change',function(e){
+ var f=e.target.files[0];if(!f)return;
+ fname=f.name.replace(/\.[^.]+$/,'')||'recolor';
+ var img=new Image(),u=URL.createObjectURL(f);
+ img.onload=function(){
+  W=img.naturalWidth;H=img.naturalHeight;
+  cv.width=W;cv.height=H;
+  ctx.clearRect(0,0,W,H);ctx.drawImage(img,0,0);
+  src=ctx.getImageData(0,0,W,H);ready=true;
+  URL.revokeObjectURL(u);
+  $('fi').textContent=f.name+' · '+W+'×'+H;
+  $('empty').style.display='none';
+  var fit=Math.min(200,Math.max(25,Math.floor((Math.min(window.innerWidth,640)-60)/W*100)));
+  $('zm').value=fit;
+  zoom();render();
+ };
+ img.onerror=function(){$('fi').textContent='Не удалось открыть файл. Выбери PNG или JPG.'};
+ img.src=u;
+});
+
+function setCol(i,hex){cs[i].value=hex;hs[i].value=hex;render()}
+cs.forEach(function(c,i){c.addEventListener('input',function(){hs[i].value=c.value;render()})});
+hs.forEach(function(h,i){h.addEventListener('input',function(){
+ var v=h.value.trim();if(v[0]!=='#')v='#'+v;
+ if(hexToRgb(v)){cs[i].value=v.toLowerCase();render()}
+});h.addEventListener('blur',function(){h.value=cs[i].value})});
+$('rs').addEventListener('click',function(){DEF.forEach(function(h,i){setCol(i,h)})});
+$('zm').addEventListener('input',zoom);
+
+/* ---------- saving (native, Capacitor Filesystem) ---------- */
+var FS=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Filesystem;
+var DIR='EXTERNAL_STORAGE',ROOT='/storage/emulated/0/',KD='rgb_recolor_dir';
+var saveDir=null,cur='',after=null;
+try{saveDir=localStorage.getItem(KD)}catch(e){}
+function msg(t){$('dm').textContent=t}
+function norm(p){return String(p||'').replace(/^\/+|\/+$/g,'')}
+function outName(){return fname+'_recolor.png'}
+function need(){if(!ready){$('empty').style.display='block';return false}if(!FS){msg('Сохранение работает только в установленном приложении.');return false}return true}
+function b64(){return cv.toDataURL('image/png').split(',')[1]}
+function showDir(){$('dn').textContent=saveDir!==null?'Папка: '+ROOT+saveDir:'Папка не выбрана'}
+var NOACC='Нет доступа к памяти. Открой Настройки → Приложения → RGB Recolor → Разрешения → Файлы и включи «Разрешить управление всеми файлами».';
+
+function writeTo(path){
+ return FS.writeFile({path:norm(path)+'/'+outName(),data:b64(),directory:DIR,recursive:true})
+  .then(function(){msg('Сохранено: '+ROOT+norm(path)+'/'+outName())})
+  .catch(function(e){msg(NOACC+' Ошибка: '+((e&&e.message)||e))});
+}
+
+function browse(p){
+ cur=norm(p);
+ $('bp').textContent=ROOT+cur;
+ return FS.readdir({path:cur,directory:DIR}).then(function(r){
+  var l=$('bl');l.innerHTML='';
+  var ds=(r.files||[]).map(function(f){return typeof f==='string'?{name:f,type:'directory'}:f})
+   .filter(function(f){return f.type==='directory'})
+   .sort(function(a,b){return a.name.localeCompare(b.name)});
+  if(!ds.length){var e=document.createElement('div');e.className='hint';e.textContent='Вложенных папок нет.';l.appendChild(e)}
+  ds.forEach(function(f){
+   var b=document.createElement('button');b.textContent='📁 '+f.name;
+   b.onclick=function(){browse(cur?cur+'/'+f.name:f.name)};
+   l.appendChild(b);
+  });
+ }).catch(function(){$('bl').innerHTML='';msg(NOACC)});
+}
+
+function openBrowser(cb){
+ after=cb;
+ $('fb').style.display='block';
+ var go=function(){browse(saveDir||'')};
+ FS.requestPermissions().then(go,go);
+ $('fb').scrollIntoView();
+}
+function closeBrowser(){$('fb').style.display='none';after=null}
+
+$('bup').addEventListener('click',function(){browse(cur.split('/').slice(0,-1).join('/'))});
+$('bno').addEventListener('click',closeBrowser);
+$('bnew').addEventListener('click',function(){
+ var n=prompt('Название новой папки');
+ if(!n)return;
+ FS.mkdir({path:(cur?cur+'/':'')+n.replace(/[\/\\]/g,''),directory:DIR,recursive:true}).then(function(){browse(cur)},function(){msg(NOACC)});
+});
+$('bok').addEventListener('click',function(){
+ saveDir=cur;
+ try{localStorage.setItem(KD,saveDir)}catch(e){}
+ showDir();
+ var cb=after;closeBrowser();
+ if(cb)cb();
+});
+
+$('bsa').addEventListener('click',function(){
+ if(!need())return;
+ openBrowser(function(){writeTo(saveDir)});
+});
+$('bs').addEventListener('click',function(){
+ if(!need())return;
+ if(saveDir===null){openBrowser(function(){writeTo(saveDir)});return}
+ FS.requestPermissions().then(function(){return writeTo(saveDir)},function(){return writeTo(saveDir)});
+});
+$('bg').addEventListener('click',function(){
+ if(!need())return;
+ FS.requestPermissions().then(function(){return writeTo('Pictures/RGBRecolor')},function(){return writeTo('Pictures/RGBRecolor')});
+});
+showDir();
+
+/* ---------- presets ---------- */
+var KEY='rgb_recolor_presets';
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}}
+function save(a){try{localStorage.setItem(KEY,JSON.stringify(a))}catch(e){}}
+var mem=load();
+function drawPresets(){
+ var l=$('pl');l.innerHTML='';
+ $('pe').style.display=mem.length?'none':'block';
+ mem.forEach(function(p,idx){
+  var d=document.createElement('div');d.className='pi';
+  var sw=document.createElement('div');sw.className='sw';
+  p.c.forEach(function(h){var i=document.createElement('i');i.style.background=h;sw.appendChild(i)});
+  var nm=document.createElement('span');nm.className='nm';nm.textContent=p.n;
+  var a=document.createElement('button');a.textContent='Применить';
+  a.onclick=function(){p.c.forEach(function(h,i){cs[i].value=h;hs[i].value=h});render()};
+  var x=document.createElement('button');x.textContent='Удалить';
+  x.onclick=function(){mem.splice(idx,1);save(mem);drawPresets()};
+  d.appendChild(sw);d.appendChild(nm);d.appendChild(a);d.appendChild(x);l.appendChild(d);
+ });
+}
+$('ps').addEventListener('click',function(){
+ var n=$('pn').value.trim()||('Пресет '+(mem.length+1));
+ mem.push({n:n,c:cs.map(function(c){return c.value})});
+ save(mem);$('pn').value='';drawPresets();
+});
+drawPresets();
+})();
+</script>
+</body>
+</html>
