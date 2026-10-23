@@ -38,7 +38,7 @@ input[type=range]{flex:1;min-width:120px}
 #bl button.fi{display:flex;gap:10px;align-items:center}
 #bl button.fi img{width:44px;height:44px;object-fit:contain;border-radius:6px;background:var(--ck2);flex:none}
 #bl button.sel{outline:2px solid var(--ac);background:var(--ck1)}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:12px;max-width:90%;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;text-align:center}
+#toast{position:fixed;left:50%;transform:translateX(-50%);width:max-content;max-width:90vw;bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:12px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;text-align:center}
 #toast.on{opacity:1}
 </style>
 </head>
@@ -104,18 +104,13 @@ function cols(){return cs.map(function(c){return hexToRgb(c.value)})}
 
 function render(){
  if(!ready)return;
- var c=cols(),up=true,kb=true;
+ var c=cols(),up=true;
  var d=new ImageData(new Uint8ClampedArray(src.data),W,H),p=d.data;
  for(var i=0;i<p.length;i+=4){
   var a=p[i+3];
   if(a===0){p[i]=0;p[i+1]=0;p[i+2]=0;continue}
   var s=(up&&a<255)?255/a:1;
   var r=Math.min(1,p[i]/255*s),g=Math.min(1,p[i+1]/255*s),b=Math.min(1,p[i+2]/255*s),dv=1;
-  if(kb){
-   var t=r+g+b;
-   if(t<0.004){p[i]=0;p[i+1]=0;p[i+2]=0;p[i+3]=0;continue}
-   if(t<1){dv=t;p[i+3]=a*t}
-  }
   for(var k=0;k<3;k++){
    var v=(r*c[0][k]+g*c[1][k]+b*c[2][k])/dv;
    p[i+k]=v>255?255:v;
@@ -185,6 +180,108 @@ function setSel(n){sel=n;$('brep').disabled=!n;$('bsel').textContent=n?'Выбр
 function browse(p){
  cur=norm(p);setSel(null);
  $('bp').textContent=ROOT+cur;
+ return FS.readdir({path:cur,directory:DIR}).then(function(r){
+  var l=$('bl');l.innerHTML='';
+  var all=(r.files||[]).map(function(f){return typeof f==='string'?{name:f,type:'directory'}:f});
+  var by=function(a,b){return a.name.localeCompare(b.name)};
+  var ds=all.filter(function(f){return f.type==='directory'}).sort(by);
+  var ps=all.filter(function(f){return f.type!=='directory'&&/\.png$/i.test(f.name)}).sort(by);
+  if(!ds.length&&!ps.length){var e=document.createElement('div');e.className='hint';e.textContent='Здесь нет папок и PNG.';l.appendChild(e)}
+  ds.forEach(function(f){
+   var b=document.createElement('button');b.textContent='📁 '+f.name;
+   b.onclick=function(){browse(cur?cur+'/'+f.name:f.name)};
+   l.appendChild(b);
+  });
+  ps.forEach(function(f){
+   var b=document.createElement('button');b.className='fi';
+   var im=document.createElement('img');im.loading='lazy';im.alt='';
+   try{im.src=window.Capacitor.convertFileSrc('file://'+encodeURI(ROOT+(cur?cur+'/':'')+f.name))}catch(e){}
+   var t=document.createElement('span');t.textContent=f.name;
+   b.appendChild(im);b.appendChild(t);
+   b.onclick=function(){[].forEach.call(l.querySelectorAll('button.sel'),function(x){x.classList.remove('sel')});b.classList.add('sel');setSel(f.name)};
+   l.appendChild(b);
+  });
+ }).catch(function(){$('bl').innerHTML='';msg(NOACC)});
+}
+
+function openBrowser(cb){
+ after=cb;
+ $('fb').style.display='block';
+ var go=function(){browse(saveDir||'')};
+ FS.requestPermissions().then(go,go);
+ $('fb').scrollIntoView();
+}
+function closeBrowser(){$('fb').style.display='none';after=null}
+
+$('bup').addEventListener('click',function(){browse(cur.split('/').slice(0,-1).join('/'))});
+$('bno').addEventListener('click',closeBrowser);
+$('bnew').addEventListener('click',function(){
+ var n=prompt('Название новой папки');
+ if(!n)return;
+ FS.mkdir({path:(cur?cur+'/':'')+n.replace(/[\/\\]/g,''),directory:DIR,recursive:true}).then(function(){browse(cur)},function(){msg(NOACC)});
+});
+$('bok').addEventListener('click',function(){
+ saveDir=cur;
+ try{localStorage.setItem(KD,saveDir)}catch(e){}
+ showDir();
+ var cb=after;closeBrowser();
+ if(cb)cb();
+});
+
+$('brep').addEventListener('click',function(){
+ if(!sel||!need())return;
+ var path=(cur?cur+'/':'')+sel;
+ if(!confirm('Заменить файл «'+sel+'» на изменённую версию?'))return;
+ FS.writeFile({path:path,data:b64(),directory:DIR,recursive:true}).then(function(){
+  msg('Заменено: '+ROOT+path);toast('Файл «'+sel+'» заменён');closeBrowser();
+ }).catch(function(e){msg(NOACC+' Ошибка: '+((e&&e.message)||e));toast('Не удалось заменить')});
+});
+$('bsa').addEventListener('click',function(){
+ if(!need())return;
+ openBrowser(function(){writeTo(saveDir)});
+});
+$('bs').addEventListener('click',function(){
+ if(!need())return;
+ if(saveDir===null){openBrowser(function(){writeTo(saveDir)});return}
+ FS.requestPermissions().then(function(){return writeTo(saveDir)},function(){return writeTo(saveDir)});
+});
+$('bg').addEventListener('click',function(){
+ if(!need())return;
+ FS.requestPermissions().then(function(){return writeTo('Pictures/RGBRecolor','Сохранено в галерею')},function(){return writeTo('Pictures/RGBRecolor','Сохранено в галерею')});
+});
+showDir();
+
+/* ---------- presets ---------- */
+var KEY='rgb_recolor_presets';
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}}
+function save(a){try{localStorage.setItem(KEY,JSON.stringify(a))}catch(e){}}
+var mem=load();
+function drawPresets(){
+ var l=$('pl');l.innerHTML='';
+ $('pe').style.display=mem.length?'none':'block';
+ mem.forEach(function(p,idx){
+  var d=document.createElement('div');d.className='pi';
+  var sw=document.createElement('div');sw.className='sw';
+  p.c.forEach(function(h){var i=document.createElement('i');i.style.background=h;sw.appendChild(i)});
+  var nm=document.createElement('span');nm.className='nm';nm.textContent=p.n;
+  var a=document.createElement('button');a.textContent='Применить';
+  a.onclick=function(){p.c.forEach(function(h,i){cs[i].value=h;hs[i].value=h});render()};
+  var x=document.createElement('button');x.textContent='Удалить';
+  x.onclick=function(){mem.splice(idx,1);save(mem);drawPresets()};
+  d.appendChild(sw);d.appendChild(nm);d.appendChild(a);d.appendChild(x);l.appendChild(d);
+ });
+}
+$('ps').addEventListener('click',function(){
+ var n=$('pn').value.trim()||('Пресет '+(mem.length+1));
+ mem.push({n:n,c:cs.map(function(c){return c.value})});
+ save(mem);$('pn').value='';drawPresets();
+});
+drawPresets();
+})();
+</script>
+</body>
+</html>
+T+cur;
  return FS.readdir({path:cur,directory:DIR}).then(function(r){
   var l=$('bl');l.innerHTML='';
   var all=(r.files||[]).map(function(f){return typeof f==='string'?{name:f,type:'directory'}:f});
