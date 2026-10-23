@@ -1,0 +1,46 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: mkdir -p www && cp index.html www/
+      - run: npm install
+      - run: npx cap add android
+      - name: Add storage permissions
+        run: |
+          sed -i 's#<application#<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <application android:requestLegacyExternalStorage="true"#' android/app/src/main/AndroidManifest.xml
+      - name: Use legacy storage mode (like Psych Engine)
+        run: sed -i 's/targetSdkVersion = [0-9]*/targetSdkVersion = 29/' android/variables.gradle
+      - name: Set app icon
+        run: |
+          set -e
+          R=android/app/src/main/res
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            case $d in
+              mdpi) L=48; F=108;;
+              hdpi) L=72; F=162;;
+              xhdpi) L=96; F=216;;
+              xxhdpi) L=144; F=324;;
+              xxxhdpi) L=192; F=432;;
+            esac
+            convert icon.png -resize "${L}x${L}!" $R/mipmap-$d/ic_launcher.png
+            cp $R/mipmap-$d/ic_launcher.png $R/mipmap-$d/ic_launcher_round.png
+            convert icon.png -resize "${F}x${F}!" $R/mipmap-$d/ic_launcher_foreground.png
+          done
+      - run: npx cap sync android
+      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RGB-Recolor-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
