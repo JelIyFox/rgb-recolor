@@ -24,20 +24,24 @@ jobs:
         run: sed -i 's/targetSdkVersion = [0-9]*/targetSdkVersion = 29/' android/variables.gradle
       - name: Set app icon
         run: |
-          set -e
-          R=android/app/src/main/res
-          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            case $d in
-              mdpi) L=48; F=108;;
-              hdpi) L=72; F=162;;
-              xhdpi) L=96; F=216;;
-              xxhdpi) L=144; F=324;;
-              xxxhdpi) L=192; F=432;;
-            esac
-            convert icon.png -resize "${L}x${L}!" $R/mipmap-$d/ic_launcher.png
-            cp $R/mipmap-$d/ic_launcher.png $R/mipmap-$d/ic_launcher_round.png
-            convert icon.png -resize "${F}x${F}!" $R/mipmap-$d/ic_launcher_foreground.png
-          done
+          pip install pillow --break-system-packages || pip install pillow
+          python3 - <<'PY'
+          import os
+          from PIL import Image
+          if not os.path.exists('icon.png'):
+              print('icon.png not found, skipping icon')
+              raise SystemExit(0)
+          im = Image.open('icon.png').convert('RGBA')
+          R = 'android/app/src/main/res'
+          sizes = {'mdpi': (48, 108), 'hdpi': (72, 162), 'xhdpi': (96, 216), 'xxhdpi': (144, 324), 'xxxhdpi': (192, 432)}
+          for d, (l, f) in sizes.items():
+              p = R + '/mipmap-' + d
+              os.makedirs(p, exist_ok=True)
+              im.resize((l, l), Image.LANCZOS).save(p + '/ic_launcher.png')
+              im.resize((l, l), Image.LANCZOS).save(p + '/ic_launcher_round.png')
+              im.resize((f, f), Image.LANCZOS).save(p + '/ic_launcher_foreground.png')
+          print('icon done')
+          PY
       - run: npx cap sync android
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
